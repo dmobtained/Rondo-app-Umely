@@ -1,0 +1,224 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+}
+
+.topbar {
+  padding: 16px 20px;
+  border-bottom: 1px solid #30363d;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.muted {
+  color: #8b949e;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+.card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.verdict-card {
+  margin: 14px 20px 0;
+  border-width: 2px;
+}
+
+.verdict-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#verdict-action {
+  margin: 0;
+  font-size: 26px;
+}
+
+#copy-order {
+  margin-top: 0;
+  font-weight: 600;
+}
+
+.verdict-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.verdict-grid div {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.verdict-instruction {
+  margin: 10px 0 0;
+  font-weight: 700;
+}
+
+#verdict-countdown {
+  margin-top: 6px;
+}
+
+.verdict-buy {
+  border-color: #2ea043;
+  box-shadow: 0 0 0 1px rgba(46, 160, 67, 0.2) inset;
+}
+
+.verdict-sell {
+  border-color: #f85149;
+  box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.2) inset;
+}
+
+.verdict-wait {
+  border-color: #d29922;
+  box-shadow: 0 0 0 1px rgba(210, 153, 34, 0.2) inset;
+}
+
+.verdict-no_trade {
+  border-color: #6e7681;
+  box-shadow: 0 0 0 1px rgba(110, 118, 129, 0.2) inset;
+}
+
+.chart-card {
+  min-height: 560px;
+}
+
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-bottom: 10px;
+}
+
+#symbol-input {
+  width: 100px;
+}
+
+#refresh-live {
+  margin-top: 0;
+  padding: 7px 10px;
+}
+
+#mt5-file-input {
+  max-width: 190px;
+}
+
+#mt5-timeframe {
+  width: 80px;
+}
+
+#analyze-mt5 {
+  margin-top: 0;
+  padding: 7px 10px;
+}
+
+#live-status {
+  font-size: 12px;
+}
+
+#chart {
+  width: 100%;
+  height: 500px;
+}
+
+.side-panel h2,
+.side-panel h3 {
+  margin-top: 0;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+  margin-bottom: 14px;
+}
+
+.meta-grid div {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+label {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+input,
+select,
+button {
+  background: #0d1117;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+button {
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.pill {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  background: #0d1117;
+}
+
+ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.metrics {
+  margin: 0 20px 18px;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 1024px) {
+  .verdict-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
