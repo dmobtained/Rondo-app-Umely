@@ -15,20 +15,71 @@ let selectedSetup = null;
 let chart = null;
 let candleSeries = null;
 let overlaySeries = [];
+let markerPlugin = null;
 
 function fmt(value, decimals = 3) {
   return Number(value).toFixed(decimals);
 }
 
+function showError(message, details) {
+  summary.textContent = details ? `${message} (${details})` : message;
+  summary.style.color = "#ff7b72";
+}
+
 function clearOverlays() {
+  if (!chart) {
+    return;
+  }
   for (const series of overlaySeries) {
     chart.removeSeries(series);
   }
   overlaySeries = [];
 }
 
+function addLineSeriesCompat(options) {
+  if (typeof chart.addLineSeries === "function") {
+    return chart.addLineSeries(options);
+  }
+  if (typeof chart.addSeries === "function" && typeof LightweightCharts.LineSeries !== "undefined") {
+    return chart.addSeries(LightweightCharts.LineSeries, options);
+  }
+  throw new Error("Line series API not supported by loaded LightweightCharts version.");
+}
+
+function addCandlestickSeriesCompat(options) {
+  if (typeof chart.addCandlestickSeries === "function") {
+    return chart.addCandlestickSeries(options);
+  }
+  if (
+    typeof chart.addSeries === "function" &&
+    typeof LightweightCharts.CandlestickSeries !== "undefined"
+  ) {
+    return chart.addSeries(LightweightCharts.CandlestickSeries, options);
+  }
+  throw new Error("Candlestick series API not supported by loaded LightweightCharts version.");
+}
+
+function setSeriesMarkersCompat(markers) {
+  if (!candleSeries) {
+    return;
+  }
+  if (typeof candleSeries.setMarkers === "function") {
+    candleSeries.setMarkers(markers);
+    return;
+  }
+  if (!markerPlugin && typeof LightweightCharts.createSeriesMarkers === "function") {
+    markerPlugin = LightweightCharts.createSeriesMarkers(candleSeries, markers);
+    return;
+  }
+  if (markerPlugin && typeof markerPlugin.setMarkers === "function") {
+    markerPlugin.setMarkers(markers);
+    return;
+  }
+  showError("Marker API not available in chart library.");
+}
+
 function createLine(fromTime, toTime, price, color) {
-  const line = chart.addLineSeries({
+  const line = addLineSeriesCompat({
     color,
     lineWidth: 1,
     crosshairMarkerVisible: false,
@@ -90,6 +141,14 @@ function recalcLot() {
   const account = Number(accountInput.value);
   const riskPct = Number(riskInput.value) / 100;
   const pointValue = Number(pointValueInput.value);
+  if (!Number.isFinite(account) || !Number.isFinite(riskPct) || !Number.isFinite(pointValue)) {
+    showError("Please enter valid numeric values for account/risk/point value.");
+    return;
+  }
+  if (account <= 0 || riskPct <= 0 || pointValue <= 0) {
+    showError("Account, risk %, and point value must be greater than zero.");
+    return;
+  }
   const riskAmount = account * riskPct;
   const stopDistance = Math.abs(selectedSetup.entryPrice - selectedSetup.stopLoss);
   const lot = stopDistance > 0 ? riskAmount / (stopDistance * pointValue) : 0;
@@ -129,56 +188,65 @@ function renderSetup(setupId) {
   if (bosMarker) {
     markers.push(bosMarker);
   }
-  candleSeries.setMarkers(markers);
+  setSeriesMarkersCompat(markers);
 
   summary.textContent = `${selectedSetup.orderType.toUpperCase()} | Entry ${fmt(selectedSetup.entryPrice)} | SL ${fmt(selectedSetup.stopLoss)} | TP ${fmt(selectedSetup.takeProfit)}`;
+  summary.style.color = "#8b949e";
 }
 
 async function init() {
   try {
     const response = await fetch("/api/demo");
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
     appState = await response.json();
   } catch (error) {
-    summary.textContent = `API error: ${String(error)}`;
+    showError("API error", String(error));
     return;
   }
 
   if (typeof LightweightCharts === "undefined") {
-    summary.textContent = "Chart library failed to load. Refresh the page.";
+    showError("Chart library failed to load. Refresh the page.");
     return;
   }
 
-  chart = LightweightCharts.createChart(chartContainer, {
-    width: chartContainer.clientWidth,
-    height: 500,
-    layout: {
-      background: { color: "#161b22" },
-      textColor: "#c9d1d9",
-    },
-    grid: {
-      vertLines: { color: "#30363d" },
-      horzLines: { color: "#30363d" },
-    },
-    crosshair: {
-      mode: 0,
-    },
-    rightPriceScale: {
-      borderColor: "#30363d",
-    },
-    timeScale: {
-      borderColor: "#30363d",
-      timeVisible: true,
-      secondsVisible: false,
-    },
-  });
+  try {
+    chart = LightweightCharts.createChart(chartContainer, {
+      width: chartContainer.clientWidth,
+      height: 500,
+      layout: {
+        background: { color: "#161b22" },
+        textColor: "#c9d1d9",
+      },
+      grid: {
+        vertLines: { color: "#30363d" },
+        horzLines: { color: "#30363d" },
+      },
+      crosshair: {
+        mode: 0,
+      },
+      rightPriceScale: {
+        borderColor: "#30363d",
+      },
+      timeScale: {
+        borderColor: "#30363d",
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    });
 
-  candleSeries = chart.addCandlestickSeries({
-    upColor: "#26a69a",
-    downColor: "#ef5350",
-    borderVisible: false,
-    wickUpColor: "#26a69a",
-    wickDownColor: "#ef5350",
-  });
+    candleSeries = addCandlestickSeriesCompat({
+      upColor: "#26a69a",
+      downColor: "#ef5350",
+      borderVisible: false,
+      wickUpColor: "#26a69a",
+      wickDownColor: "#ef5350",
+    });
+  } catch (error) {
+    showError("Chart init error", String(error));
+    return;
+  }
 
   candleSeries.setData(
     appState.candles.map((candle) => ({
@@ -192,6 +260,7 @@ async function init() {
 
   accountInput.value = String(appState.config.accountSize);
   riskInput.value = String(appState.config.riskPerTradePct * 100);
+  pointValueInput.value = String(appState.config.instrumentPointValue ?? 100);
 
   for (const setup of appState.setups) {
     const option = document.createElement("option");
@@ -205,7 +274,9 @@ async function init() {
   setupSelect.addEventListener("change", () => renderSetup(setupSelect.value));
   recalcBtn.addEventListener("click", recalcLot);
   window.addEventListener("resize", () => {
-    chart.applyOptions({ width: chartContainer.clientWidth });
+    if (chart) {
+      chart.applyOptions({ width: chartContainer.clientWidth });
+    }
   });
 
   if (appState.setups.length > 0) {
@@ -216,4 +287,10 @@ async function init() {
   }
 }
 
-init();
+window.addEventListener("error", (event) => {
+  showError("Runtime error", event.message);
+});
+
+init().catch((error) => {
+  showError("Fatal UI init error", String(error));
+});

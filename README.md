@@ -108,6 +108,9 @@ In de UI zie je:
 - MT5 invoervelden (order type, entry, SL, TP)
 - lot size calculator (account + risk%)
 
+Standaard rekent de demo met `instrumentPointValue = 100` voor XAUUSD
+(ongeveer $100 PnL per $1 move op 1.00 lot; broker-specs altijd verifiëren).
+
 ## TODO (bewust buiten scope van v1 foundation)
 
 - Broker execution adapters (MT5/cTrader/REST)

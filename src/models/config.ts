@@ -170,7 +170,7 @@ export const defaultConfig: DorisViewConfig = {
     breakEvenAfterR: 1.2,
     partialTakeProfitAtR: 1,
     partialTakeProfitSizePct: 0.5,
-    instrumentPointValue: 1,
+    instrumentPointValue: 100,
     stopBufferPct: 0.0001,
   },
   confidence: {
