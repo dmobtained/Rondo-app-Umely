@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import type { IncomingMessage } from "node:http";
+import { buildTradeVerdict } from "../core/trade_verdict_engine.js";
 import { runLivePipeline } from "../live/livePipeline.js";
 import { runMt5CsvPipeline } from "../live/mt5CsvPipeline.js";
 import { runDemoPipeline } from "../demo/demoPipeline.js";
@@ -98,12 +99,18 @@ function buildApiPayload(args: {
     generatedAt: args.fetchedAt,
     liveConnected: args.mode === "live",
     providerSymbol: args.providerSymbol,
+    structure: {
+      htfBias: result.analysis.htfStructure.bias,
+      ltfBias: result.analysis.ltfStructure.bias,
+    },
     config: {
       symbol: result.config.symbol,
+      ltfTimeframe: result.config.timeframe.ltf,
       riskPerTradePct: result.config.risk.riskPerTradePct,
       accountSize: result.config.risk.accountSize,
       minRiskReward: result.config.risk.minRiskReward,
       instrumentPointValue: result.config.risk.instrumentPointValue,
+      verdict: result.config.verdict,
     },
     candles: result.ltfCandles,
     liquidityPools: result.analysis.liquidityPools,
@@ -111,6 +118,12 @@ function buildApiPayload(args: {
     bosEvents: result.analysis.bosEvents,
     fvgs: result.analysis.fairValueGaps,
     setups: toUiSetups(result.analysis.setups),
+    verdict: buildTradeVerdict({
+      symbol: result.config.symbol,
+      config: result.config,
+      ltfCandles: result.ltfCandles,
+      analysis: result.analysis,
+    }),
     backtestMetrics: result.backtest.metrics,
     backtestTrades: result.backtest.trades,
   };

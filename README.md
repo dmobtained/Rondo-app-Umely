@@ -25,6 +25,7 @@ Deze codebase vertaalt een subjectieve liquidity-trading methode naar objectieve
     bosDetector.ts       # Break of Structure / CHoCH na sweep
     fvgDetector.ts       # FVG detectie + fill/expiry informatie
     entryEngine.ts       # Setup generatie met RR + confidence score
+    trade_verdict_engine.ts # Zet analyse om naar 1 MT5 actie
     riskManager.ts       # Position sizing op basis van stop distance
     tradeValidator.ts    # Session/ATR/chop/alignment filters
   /models
@@ -149,6 +150,29 @@ npm run ui
 7. Klik `Analyse CSV`
 
 De engine resampled intern naar LTF/HTF voor structuurdetectie en tekent daarna setups op jouw brokerdata.
+
+## Trade verdict engine (grote actie bovenaan)
+
+`src/core/trade_verdict_engine.ts` vertaalt analyse-output naar 1 duidelijke actie:
+
+- `NU BUY LIMIT PLAATSEN`
+- `NU SELL LIMIT PLAATSEN`
+- `WACHTEN`
+- `GEEN TRADE`
+
+Validatieregels (aanpasbaar in `src/models/config.ts` onder `verdict`):
+
+- `minimumConfidence` (default 65)
+- `minimumRiskReward` (default 2.0)
+- `maxEntryDistancePct` (default 0.25%)
+- `maxStopDistancePct` (default 0.6%)
+
+UI extras:
+- grote actiekaart met kleur (groen/rood/geel/grijs)
+- COPY MT5 ORDER knop
+- huidige prijs
+- countdown tot candle close
+- setup verval in aantal candles
 
 ## TODO (bewust buiten scope van v1 foundation)
 

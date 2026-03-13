@@ -87,6 +87,13 @@ export interface ConfidenceWeights {
   readonly sessionQuality: number;
 }
 
+export interface TradeVerdictConfig {
+  readonly minimumConfidence: number;
+  readonly minimumRiskReward: number;
+  readonly maxEntryDistancePct: number;
+  readonly maxStopDistancePct: number;
+}
+
 export interface DorisViewConfig {
   readonly symbol: string;
   readonly timeframe: TimeframeConfig;
@@ -98,6 +105,7 @@ export interface DorisViewConfig {
   readonly filters: FilterConfig;
   readonly risk: RiskConfig;
   readonly confidence: ConfidenceWeights;
+  readonly verdict: TradeVerdictConfig;
 }
 
 export const defaultConfig: DorisViewConfig = {
@@ -180,5 +188,11 @@ export const defaultConfig: DorisViewConfig = {
     fvgQuality: 20,
     rrQuality: 15,
     sessionQuality: 5,
+  },
+  verdict: {
+    minimumConfidence: 65,
+    minimumRiskReward: 2,
+    maxEntryDistancePct: 0.0025,
+    maxStopDistancePct: 0.006,
   },
 };

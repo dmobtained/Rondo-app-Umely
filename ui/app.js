@@ -8,6 +8,12 @@ const mt5Timeframe = document.getElementById("mt5-timeframe");
 const analyzeMt5Btn = document.getElementById("analyze-mt5");
 const liveStatus = document.getElementById("live-status");
 const summary = document.getElementById("summary");
+const verdictCard = document.getElementById("verdict-card");
+const verdictAction = document.getElementById("verdict-action");
+const verdictGrid = document.getElementById("verdict-grid");
+const verdictInstruction = document.getElementById("verdict-instruction");
+const verdictCountdown = document.getElementById("verdict-countdown");
+const copyOrderBtn = document.getElementById("copy-order");
 const setupMeta = document.getElementById("setup-meta");
 const reasonsList = document.getElementById("reasons");
 const metricsEl = document.getElementById("metrics");
@@ -25,9 +31,15 @@ let overlaySeries = [];
 let markerPlugin = null;
 let livePollingTimer = null;
 let mt5CsvText = "";
+let verdictTimer = null;
+let activeVerdict = null;
 
 function fmt(value, decimals = 3) {
   return Number(value).toFixed(decimals);
+}
+
+function fmtPct(value) {
+  return `${(value * 100).toFixed(2)}%`;
 }
 
 function setLiveStatusText(text, color = "#8b949e") {
@@ -112,6 +124,99 @@ function clearSetupPanels() {
   reasonsList.innerHTML = "";
   setSeriesMarkersCompat([]);
   clearOverlays();
+}
+
+function verdictClassFromTone(tone) {
+  if (tone === "buy") {
+    return "verdict-buy";
+  }
+  if (tone === "sell") {
+    return "verdict-sell";
+  }
+  if (tone === "wait") {
+    return "verdict-wait";
+  }
+  return "verdict-no_trade";
+}
+
+function copyTextForVerdict(verdict) {
+  if (!verdict || verdict.entryPrice === undefined || verdict.stopLoss === undefined || verdict.takeProfit === undefined) {
+    return "";
+  }
+  const lot = verdict.lotSize !== undefined ? verdict.lotSize.toFixed(2) : "-";
+  return [
+    `Instrument: ${verdict.instrument}`,
+    `Action: ${verdict.action}`,
+    `Entry: ${verdict.entryPrice}`,
+    `Stop Loss: ${verdict.stopLoss}`,
+    `Take Profit: ${verdict.takeProfit}`,
+    `Lot Size: ${lot}`,
+  ].join("\n");
+}
+
+function stopVerdictTimer() {
+  if (verdictTimer) {
+    clearInterval(verdictTimer);
+    verdictTimer = null;
+  }
+}
+
+function updateVerdictCountdown(verdict) {
+  const parts = [];
+  if (verdict.candleCloseTimestamp) {
+    const secondsLeft = Math.max(0, Math.floor((verdict.candleCloseTimestamp - Date.now()) / 1000));
+    parts.push(`Candle close in: ${secondsLeft}s`);
+  }
+  if (verdict.setupExpiresInCandles !== undefined) {
+    parts.push(`Setup expires in: ${verdict.setupExpiresInCandles} candles`);
+  }
+  verdictCountdown.textContent = parts.join(" | ");
+}
+
+function renderVerdict(verdict) {
+  activeVerdict = verdict ?? null;
+  if (!activeVerdict) {
+    return;
+  }
+
+  verdictAction.textContent = `ACTIE: ${activeVerdict.action}`;
+  verdictCard.classList.remove("verdict-buy", "verdict-sell", "verdict-wait", "verdict-no_trade");
+  verdictCard.classList.add(verdictClassFromTone(activeVerdict.tone));
+
+  const fields = [
+    ["Instrument", activeVerdict.instrument ?? "-"],
+    ["Entry", activeVerdict.entryPrice !== undefined ? fmt(activeVerdict.entryPrice) : "-"],
+    ["Stop Loss", activeVerdict.stopLoss !== undefined ? fmt(activeVerdict.stopLoss) : "-"],
+    ["Take Profit", activeVerdict.takeProfit !== undefined ? fmt(activeVerdict.takeProfit) : "-"],
+    ["Risk Reward", activeVerdict.riskReward !== undefined ? fmt(activeVerdict.riskReward, 2) : "-"],
+    ["Confidence", activeVerdict.confidence !== undefined ? `${fmt(activeVerdict.confidence, 1)}%` : "-"],
+    ["Lot Size", activeVerdict.lotSize !== undefined ? activeVerdict.lotSize.toFixed(2) : "-"],
+    ["Huidige Prijs", fmt(activeVerdict.currentPrice)],
+    [
+      "Entry afstand",
+      activeVerdict.entryDistancePct !== undefined ? fmtPct(activeVerdict.entryDistancePct) : "-",
+    ],
+    [
+      "Stop afstand",
+      activeVerdict.stopDistancePct !== undefined ? fmtPct(activeVerdict.stopDistancePct) : "-",
+    ],
+  ];
+
+  verdictGrid.innerHTML = "";
+  for (const [label, value] of fields) {
+    const box = document.createElement("div");
+    box.textContent = `${label}: ${value}`;
+    verdictGrid.appendChild(box);
+  }
+
+  verdictInstruction.textContent = "Voer deze waarden in bij MT5 en plaats de order.";
+  updateVerdictCountdown(activeVerdict);
+  stopVerdictTimer();
+  verdictTimer = setInterval(() => {
+    if (activeVerdict) {
+      updateVerdictCountdown(activeVerdict);
+    }
+  }, 1000);
 }
 
 function markerForIndex(index, shape, color, text) {
@@ -356,6 +461,8 @@ function applyPayload(payload) {
     summary.style.color = "#8b949e";
   }
 
+  renderVerdict(appState.verdict);
+
   const source = appState.source?.toUpperCase?.() ?? "UNKNOWN";
   const generatedAt = appState.generatedAt ? new Date(appState.generatedAt).toLocaleTimeString() : "n/a";
   if (appState.mode === "live") {
@@ -430,6 +537,19 @@ async function init() {
     }
     mt5CsvText = await file.text();
     setLiveStatusText(`CSV selected: ${file.name} (${Math.round(file.size / 1024)} KB)`, "#58a6ff");
+  });
+  copyOrderBtn.addEventListener("click", async () => {
+    const text = copyTextForVerdict(activeVerdict);
+    if (!text) {
+      setLiveStatusText("Geen order data om te kopieren.", "#d29922");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setLiveStatusText("MT5 order copied to clipboard.", "#56d364");
+    } catch (error) {
+      setLiveStatusText(`Copy failed: ${String(error)}`, "#ff7b72");
+    }
   });
   modeSelect.addEventListener("change", () => {
     stopLivePolling();
