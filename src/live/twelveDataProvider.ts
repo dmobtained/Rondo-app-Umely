@@ -88,15 +88,18 @@ export async function fetchTwelveDataCandles(request: LiveCandleRequest): Promis
   }
 
   return json.values
-    .map((value) => ({
-      symbol: symbol.replace("/", ""),
-      timestamp: parseTimestamp(value.datetime),
-      open: Number(value.open),
-      high: Number(value.high),
-      low: Number(value.low),
-      close: Number(value.close),
-      volume: value.volume ? Number(value.volume) : undefined,
-    }))
+    .map((value) => {
+      const parsedVolume = value.volume ? Number(value.volume) : undefined;
+      return {
+        symbol: symbol.replace("/", ""),
+        timestamp: parseTimestamp(value.datetime),
+        open: Number(value.open),
+        high: Number(value.high),
+        low: Number(value.low),
+        close: Number(value.close),
+        ...(parsedVolume !== undefined ? { volume: parsedVolume } : {}),
+      };
+    })
     .filter(
       (candle) =>
         Number.isFinite(candle.timestamp) &&
