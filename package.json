@@ -1,0 +1,29 @@
+{
+  "name": "dorisview-liquidity-bot",
+  "version": "1.0.0",
+  "description": "Modular DorisView liquidity trading engine foundation",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/index.ts",
+    "backtest": "tsx src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dmobtained/Rondo-app-Umely.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dmobtained/Rondo-app-Umely/issues"
+  },
+  "homepage": "https://github.com/dmobtained/Rondo-app-Umely#readme",
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
