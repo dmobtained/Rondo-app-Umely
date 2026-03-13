@@ -1,10 +1,14 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { extname, join, resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import { runDemoPipeline } from "../demo/demoPipeline.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const STATIC_DIR = resolve(process.cwd(), "ui");
+const LIGHTWEIGHT_CHARTS_FILE = resolve(
+  process.cwd(),
+  "node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js",
+);
 
 interface UiSetupRow {
   readonly id: string;
@@ -88,9 +92,21 @@ async function serveFile(path: string): Promise<{ status: number; body: string; 
   }
 }
 
+function resolveStaticPath(urlPath: string): string | undefined {
+  const trimmed = urlPath.replace(/^\/+/, "");
+  const requested = trimmed.length > 0 ? trimmed : "index.html";
+  const filePath = resolve(STATIC_DIR, requested);
+  if (!filePath.startsWith(STATIC_DIR)) {
+    return undefined;
+  }
+  return filePath;
+}
+
 const server = createServer(async (request, response) => {
-  const url = request.url ?? "/";
-  if (url === "/api/demo") {
+  const requestUrl = new URL(request.url ?? "/", `http://localhost:${PORT}`);
+  const path = requestUrl.pathname;
+
+  if (path === "/api/demo") {
     const payload = JSON.stringify(buildApiPayload(), (_, value) => {
       if (typeof value === "number" && !Number.isFinite(value)) {
         return value > 0 ? "Infinity" : "-Infinity";
@@ -102,8 +118,19 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  const normalizedPath = url === "/" ? "/index.html" : url;
-  const filePath = join(STATIC_DIR, normalizedPath);
+  if (path === "/vendor/lightweight-charts.js") {
+    const file = await serveFile(LIGHTWEIGHT_CHARTS_FILE);
+    response.writeHead(file.status, { "Content-Type": "application/javascript; charset=utf-8" });
+    response.end(file.body);
+    return;
+  }
+
+  const filePath = resolveStaticPath(path);
+  if (!filePath) {
+    response.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("Forbidden");
+    return;
+  }
   const file = await serveFile(filePath);
   response.writeHead(file.status, { "Content-Type": file.type });
   response.end(file.body);

@@ -135,8 +135,18 @@ function renderSetup(setupId) {
 }
 
 async function init() {
-  const response = await fetch("/api/demo");
-  appState = await response.json();
+  try {
+    const response = await fetch("/api/demo");
+    appState = await response.json();
+  } catch (error) {
+    summary.textContent = `API error: ${String(error)}`;
+    return;
+  }
+
+  if (typeof LightweightCharts === "undefined") {
+    summary.textContent = "Chart library failed to load. Refresh the page.";
+    return;
+  }
 
   chart = LightweightCharts.createChart(chartContainer, {
     width: chartContainer.clientWidth,
