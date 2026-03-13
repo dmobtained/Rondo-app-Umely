@@ -16,8 +16,17 @@
     <main class="layout">
       <section class="card chart-card">
         <div class="chart-toolbar">
+          <label for="mode-select">Mode:</label>
+          <select id="mode-select">
+            <option value="demo">Demo</option>
+            <option value="live">Live</option>
+          </select>
+          <label for="symbol-input">Symbol:</label>
+          <input id="symbol-input" type="text" value="XAU/USD" />
+          <button id="refresh-live" type="button">Refresh now</button>
           <label for="setup-select">Setup:</label>
           <select id="setup-select"></select>
+          <span id="live-status" class="muted"></span>
           <span id="summary" class="muted"></span>
         </div>
         <div id="chart"></div>

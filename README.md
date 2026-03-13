@@ -42,6 +42,9 @@ Deze codebase vertaalt een subjectieve liquidity-trading methode naar objectieve
   /backtest
     backtestEngine.ts    # Candle-by-candle setup lifecycle simulatie
     metrics.ts           # Winrate, PF, average R, total R
+  /live
+    twelveDataProvider.ts # Live XAU/USD candles via TwelveData API
+    livePipeline.ts       # Live analyse-pipeline (HTF+LTF -> setups)
   /strategies
     dorisViewStrategy.ts # Orchestrator van de volledige pipeline
   /data
@@ -110,6 +113,23 @@ In de UI zie je:
 
 Standaard rekent de demo met `instrumentPointValue = 100` voor XAUUSD
 (ongeveer $100 PnL per $1 move op 1.00 lot; broker-specs altijd verifiëren).
+
+### Live mode in UI
+
+De UI heeft een **Demo/Live** selector.
+Voor live candles via TwelveData:
+
+```bash
+export TWELVEDATA_API_KEY="jouw_api_key"
+npm run ui
+```
+
+Daarna in de UI:
+1. zet mode op `Live`
+2. laat symbool op `XAU/USD` (of pas aan)
+3. gebruik `Refresh now` of wacht op auto-refresh (30s)
+
+Zonder API key blijft demo mode beschikbaar en krijg je een duidelijke foutmelding in live mode.
 
 ## TODO (bewust buiten scope van v1 foundation)
 

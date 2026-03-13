@@ -1,5 +1,9 @@
 const chartContainer = document.getElementById("chart");
 const setupSelect = document.getElementById("setup-select");
+const modeSelect = document.getElementById("mode-select");
+const symbolInput = document.getElementById("symbol-input");
+const refreshLiveBtn = document.getElementById("refresh-live");
+const liveStatus = document.getElementById("live-status");
 const summary = document.getElementById("summary");
 const setupMeta = document.getElementById("setup-meta");
 const reasonsList = document.getElementById("reasons");
@@ -16,9 +20,15 @@ let chart = null;
 let candleSeries = null;
 let overlaySeries = [];
 let markerPlugin = null;
+let livePollingTimer = null;
 
 function fmt(value, decimals = 3) {
   return Number(value).toFixed(decimals);
+}
+
+function setLiveStatusText(text, color = "#8b949e") {
+  liveStatus.textContent = text;
+  liveStatus.style.color = color;
 }
 
 function showError(message, details) {
@@ -93,6 +103,13 @@ function createLine(fromTime, toTime, price, color) {
   overlaySeries.push(line);
 }
 
+function clearSetupPanels() {
+  setupMeta.innerHTML = "";
+  reasonsList.innerHTML = "";
+  setSeriesMarkersCompat([]);
+  clearOverlays();
+}
+
 function markerForIndex(index, shape, color, text) {
   const candle = appState.candles[index];
   if (!candle) {
@@ -153,11 +170,15 @@ function recalcLot() {
   const stopDistance = Math.abs(selectedSetup.entryPrice - selectedSetup.stopLoss);
   const lot = stopDistance > 0 ? riskAmount / (stopDistance * pointValue) : 0;
   lotResult.textContent = `Use approx ${lot.toFixed(2)} lot | Risk $${riskAmount.toFixed(2)} | Stop distance ${stopDistance.toFixed(3)}`;
+  summary.style.color = "#8b949e";
 }
 
 function renderSetup(setupId) {
   selectedSetup = appState.setups.find((item) => item.id === setupId) ?? null;
   if (!selectedSetup) {
+    clearSetupPanels();
+    summary.textContent = "No valid setup selected.";
+    summary.style.color = "#8b949e";
     return;
   }
 
@@ -194,60 +215,79 @@ function renderSetup(setupId) {
   summary.style.color = "#8b949e";
 }
 
-async function init() {
-  try {
-    const response = await fetch("/api/demo");
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    appState = await response.json();
-  } catch (error) {
-    showError("API error", String(error));
-    return;
-  }
+function updateModeControls() {
+  const liveMode = modeSelect.value === "live";
+  symbolInput.disabled = !liveMode;
+  refreshLiveBtn.disabled = !liveMode;
+}
 
+function getApiPath(force = false) {
+  if (modeSelect.value === "live") {
+    const symbol = encodeURIComponent(symbolInput.value.trim() || "XAU/USD");
+    const forceFlag = force ? "&force=1" : "";
+    return `/api/live?symbol=${symbol}${forceFlag}`;
+  }
+  return "/api/demo";
+}
+
+async function fetchPayload(force = false) {
+  const response = await fetch(getApiPath(force));
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = payload?.error ? String(payload.error) : `HTTP ${response.status}`;
+    throw new Error(detail);
+  }
+  return payload;
+}
+
+function ensureChart() {
   if (typeof LightweightCharts === "undefined") {
-    showError("Chart library failed to load. Refresh the page.");
+    throw new Error("Chart library failed to load.");
+  }
+  if (chart && candleSeries) {
     return;
   }
 
-  try {
-    chart = LightweightCharts.createChart(chartContainer, {
-      width: chartContainer.clientWidth,
-      height: 500,
-      layout: {
-        background: { color: "#161b22" },
-        textColor: "#c9d1d9",
-      },
-      grid: {
-        vertLines: { color: "#30363d" },
-        horzLines: { color: "#30363d" },
-      },
-      crosshair: {
-        mode: 0,
-      },
-      rightPriceScale: {
-        borderColor: "#30363d",
-      },
-      timeScale: {
-        borderColor: "#30363d",
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    });
+  chart = LightweightCharts.createChart(chartContainer, {
+    width: chartContainer.clientWidth,
+    height: 500,
+    layout: {
+      background: { color: "#161b22" },
+      textColor: "#c9d1d9",
+    },
+    grid: {
+      vertLines: { color: "#30363d" },
+      horzLines: { color: "#30363d" },
+    },
+    crosshair: {
+      mode: 0,
+    },
+    rightPriceScale: {
+      borderColor: "#30363d",
+    },
+    timeScale: {
+      borderColor: "#30363d",
+      timeVisible: true,
+      secondsVisible: false,
+    },
+  });
 
-    candleSeries = addCandlestickSeriesCompat({
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderVisible: false,
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
-    });
-  } catch (error) {
-    showError("Chart init error", String(error));
-    return;
+  candleSeries = addCandlestickSeriesCompat({
+    upColor: "#26a69a",
+    downColor: "#ef5350",
+    borderVisible: false,
+    wickUpColor: "#26a69a",
+    wickDownColor: "#ef5350",
+  });
+}
+
+function applyPayload(payload) {
+  appState = payload;
+  if (!appState || !Array.isArray(appState.candles)) {
+    throw new Error("API payload missing candle data.");
   }
 
+  ensureChart();
   candleSeries.setData(
     appState.candles.map((candle) => ({
       time: Math.floor(candle.timestamp / 1000),
@@ -261,7 +301,10 @@ async function init() {
   accountInput.value = String(appState.config.accountSize);
   riskInput.value = String(appState.config.riskPerTradePct * 100);
   pointValueInput.value = String(appState.config.instrumentPointValue ?? 100);
+  metricsEl.textContent = JSON.stringify(appState.backtestMetrics, null, 2);
 
+  const previousSelected = setupSelect.value;
+  setupSelect.innerHTML = "";
   for (const setup of appState.setups) {
     const option = document.createElement("option");
     option.value = setup.id;
@@ -269,22 +312,89 @@ async function init() {
     setupSelect.appendChild(option);
   }
 
-  metricsEl.textContent = JSON.stringify(appState.backtestMetrics, null, 2);
+  if (appState.setups.length > 0) {
+    const keepSelection = appState.setups.some((setup) => setup.id === previousSelected);
+    const selectedId = keepSelection ? previousSelected : appState.setups[0].id;
+    setupSelect.value = selectedId;
+    renderSetup(selectedId);
+  } else {
+    clearSetupPanels();
+    summary.textContent = "No setup detected in current dataset.";
+    summary.style.color = "#8b949e";
+  }
 
+  const source = appState.source?.toUpperCase?.() ?? "UNKNOWN";
+  const generatedAt = appState.generatedAt ? new Date(appState.generatedAt).toLocaleTimeString() : "n/a";
+  if (modeSelect.value === "live") {
+    setLiveStatusText(
+      `LIVE ${source} | Updated ${generatedAt} | ${appState.providerSymbol ?? "XAU/USD"}`,
+      "#56d364",
+    );
+  } else {
+    setLiveStatusText(`DEMO ${source} | Updated ${generatedAt}`, "#8b949e");
+  }
+}
+
+function stopLivePolling() {
+  if (livePollingTimer) {
+    clearInterval(livePollingTimer);
+    livePollingTimer = null;
+  }
+}
+
+function startLivePolling() {
+  stopLivePolling();
+  if (modeSelect.value !== "live") {
+    return;
+  }
+  livePollingTimer = setInterval(async () => {
+    try {
+      const payload = await fetchPayload(false);
+      applyPayload(payload);
+    } catch (error) {
+      setLiveStatusText(`LIVE disconnected: ${String(error)}`, "#ff7b72");
+    }
+  }, 30_000);
+}
+
+async function loadData(force = false) {
+  updateModeControls();
+  try {
+    const payload = await fetchPayload(force);
+    applyPayload(payload);
+    startLivePolling();
+  } catch (error) {
+    showError("API error", String(error));
+    if (modeSelect.value === "live") {
+      setLiveStatusText(`LIVE error: ${String(error)}`, "#ff7b72");
+    }
+  }
+}
+
+async function init() {
   setupSelect.addEventListener("change", () => renderSetup(setupSelect.value));
   recalcBtn.addEventListener("click", recalcLot);
+  refreshLiveBtn.addEventListener("click", () => {
+    if (modeSelect.value === "live") {
+      loadData(true).catch((error) => showError("Refresh error", String(error)));
+    }
+  });
+  modeSelect.addEventListener("change", () => {
+    stopLivePolling();
+    loadData(true).catch((error) => showError("Mode change error", String(error)));
+  });
+  symbolInput.addEventListener("change", () => {
+    if (modeSelect.value === "live") {
+      loadData(true).catch((error) => showError("Symbol change error", String(error)));
+    }
+  });
   window.addEventListener("resize", () => {
     if (chart) {
       chart.applyOptions({ width: chartContainer.clientWidth });
     }
   });
 
-  if (appState.setups.length > 0) {
-    setupSelect.value = appState.setups[0].id;
-    renderSetup(appState.setups[0].id);
-  } else {
-    summary.textContent = "No setup detected in current demo dataset.";
-  }
+  await loadData(true);
 }
 
 window.addEventListener("error", (event) => {

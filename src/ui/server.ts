@@ -1,9 +1,15 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
+import { runLivePipeline } from "../live/livePipeline.js";
 import { runDemoPipeline } from "../demo/demoPipeline.js";
+import type { Candle } from "../models/candle.js";
+import type { DorisViewConfig } from "../models/config.js";
+import type { StrategyAnalysisResult } from "../strategies/dorisViewStrategy.js";
+import type { BacktestResult } from "../backtest/backtestEngine.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
+const LIVE_CACHE_MS = 20_000;
 const STATIC_DIR = resolve(process.cwd(), "ui");
 const LIGHTWEIGHT_CHARTS_FILE = resolve(
   process.cwd(),
@@ -26,6 +32,21 @@ interface UiSetupRow {
   readonly reasons: readonly string[];
 }
 
+interface PipelineShape {
+  readonly config: DorisViewConfig;
+  readonly ltfCandles: readonly Candle[];
+  readonly analysis: StrategyAnalysisResult;
+  readonly backtest: BacktestResult;
+}
+
+interface LiveCacheEntry {
+  readonly key: string;
+  readonly expiresAt: number;
+  readonly payload: unknown;
+}
+
+let liveCache: LiveCacheEntry | undefined;
+
 function contentType(path: string): string {
   const extension = extname(path).toLowerCase();
   if (extension === ".html") {
@@ -43,8 +64,8 @@ function contentType(path: string): string {
   return "text/plain; charset=utf-8";
 }
 
-function toUiSetups(result: ReturnType<typeof runDemoPipeline>): UiSetupRow[] {
-  return result.analysis.setups.map((setup) => ({
+function toUiSetups(setups: StrategyAnalysisResult["setups"]): UiSetupRow[] {
+  return setups.map((setup) => ({
     id: setup.id,
     symbol: setup.symbol,
     direction: setup.direction,
@@ -61,10 +82,20 @@ function toUiSetups(result: ReturnType<typeof runDemoPipeline>): UiSetupRow[] {
   }));
 }
 
-function buildApiPayload(): unknown {
-  const result = runDemoPipeline();
+function buildApiPayload(args: {
+  mode: "demo" | "live";
+  source: "mock" | "twelvedata";
+  fetchedAt: string;
+  providerSymbol?: string;
+  pipeline: PipelineShape;
+}): unknown {
+  const result = args.pipeline;
   return {
-    generatedAt: new Date().toISOString(),
+    mode: args.mode,
+    source: args.source,
+    generatedAt: args.fetchedAt,
+    liveConnected: args.mode === "live",
+    providerSymbol: args.providerSymbol,
     config: {
       symbol: result.config.symbol,
       riskPerTradePct: result.config.risk.riskPerTradePct,
@@ -77,9 +108,23 @@ function buildApiPayload(): unknown {
     sweeps: result.analysis.sweeps,
     bosEvents: result.analysis.bosEvents,
     fvgs: result.analysis.fairValueGaps,
-    setups: toUiSetups(result),
+    setups: toUiSetups(result.analysis.setups),
     backtestMetrics: result.backtest.metrics,
     backtestTrades: result.backtest.trades,
+  };
+}
+
+function jsonResponse(payload: unknown): { status: number; body: string; type: string } {
+  const body = JSON.stringify(payload, (_, value) => {
+    if (typeof value === "number" && !Number.isFinite(value)) {
+      return value > 0 ? "Infinity" : "-Infinity";
+    }
+    return value;
+  });
+  return {
+    status: 200,
+    body,
+    type: "application/json; charset=utf-8",
   };
 }
 
@@ -106,16 +151,72 @@ const server = createServer(async (request, response) => {
   const requestUrl = new URL(request.url ?? "/", `http://localhost:${PORT}`);
   const path = requestUrl.pathname;
 
-  if (path === "/api/demo") {
-    const payload = JSON.stringify(buildApiPayload(), (_, value) => {
-      if (typeof value === "number" && !Number.isFinite(value)) {
-        return value > 0 ? "Infinity" : "-Infinity";
+  if (path === "/api/demo" || path === "/api/live") {
+    try {
+      if (path === "/api/demo") {
+        const demo = runDemoPipeline();
+        const payload = buildApiPayload({
+          mode: "demo",
+          source: "mock",
+          fetchedAt: new Date().toISOString(),
+          pipeline: demo,
+        });
+        const json = jsonResponse(payload);
+        response.writeHead(json.status, { "Content-Type": json.type });
+        response.end(json.body);
+        return;
       }
-      return value;
-    });
-    response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-    response.end(payload);
-    return;
+
+      const apiKey = process.env.TWELVEDATA_API_KEY;
+      if (!apiKey) {
+        response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+        response.end(
+          JSON.stringify({
+            error:
+              "Live mode requires TWELVEDATA_API_KEY in environment. Keep demo mode on until key is configured.",
+          }),
+        );
+        return;
+      }
+
+      const symbol = requestUrl.searchParams.get("symbol") ?? "XAU/USD";
+      const forceRefresh = requestUrl.searchParams.get("force") === "1";
+      const cacheKey = symbol.toUpperCase();
+      if (!forceRefresh && liveCache && liveCache.key === cacheKey && Date.now() < liveCache.expiresAt) {
+        const json = jsonResponse(liveCache.payload);
+        response.writeHead(json.status, { "Content-Type": json.type });
+        response.end(json.body);
+        return;
+      }
+
+      const live = await runLivePipeline({
+        apiKey,
+        symbol,
+      });
+      const payload = buildApiPayload({
+        mode: "live",
+        source: "twelvedata",
+        fetchedAt: live.fetchedAt,
+        providerSymbol: live.providerSymbol,
+        pipeline: live.result,
+      });
+
+      liveCache = {
+        key: cacheKey,
+        expiresAt: Date.now() + LIVE_CACHE_MS,
+        payload,
+      };
+
+      const json = jsonResponse(payload);
+      response.writeHead(json.status, { "Content-Type": json.type });
+      response.end(json.body);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      response.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: message }));
+      return;
+    }
   }
 
   if (path === "/vendor/lightweight-charts.js") {
