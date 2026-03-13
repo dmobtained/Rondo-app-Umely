@@ -259,8 +259,11 @@ export function runMt5CsvPipeline(params: Mt5CsvAnalyzeParams): Mt5CsvPipelineRe
   const htfCandles = resampleCandles(baseCandles, params.sourceTimeframe, effectiveHtf);
 
   if (ltfCandles.length < 120 || htfCandles.length < 50) {
+    const minRowsFromLtf = Math.ceil((120 * timeframeToMs(effectiveLtf)) / timeframeToMs(params.sourceTimeframe));
+    const minRowsFromHtf = Math.ceil((50 * timeframeToMs(effectiveHtf)) / timeframeToMs(params.sourceTimeframe));
+    const suggestedRows = Math.max(minRowsFromLtf, minRowsFromHtf);
     throw new Error(
-      "Not enough candles after resampling. Export more history from MT5 (at least 500+ rows).",
+      `Not enough candles after resampling (ltf=${ltfCandles.length}, htf=${htfCandles.length}). Export at least ~${suggestedRows} rows from MT5.`,
     );
   }
 
