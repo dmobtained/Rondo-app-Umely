@@ -219,6 +219,22 @@ function renderVerdict(verdict) {
   }, 1000);
 }
 
+function enterSafeNoTradeState(message) {
+  clearSetupPanels();
+  setupSelect.innerHTML = "";
+  metricsEl.textContent = "";
+  const fallbackInstrument =
+    appState?.providerSymbol ?? appState?.config?.symbol ?? symbolInput.value ?? "XAUUSD";
+  renderVerdict({
+    action: "GEEN TRADE",
+    tone: "no_trade",
+    instrument: fallbackInstrument,
+    currentPrice: appState?.candles?.at?.(-1)?.close ?? 0,
+    reasons: [message],
+    mt5Instruction: "Voer deze waarden in bij MT5 en plaats de order.",
+  });
+}
+
 function markerForIndex(index, shape, color, text) {
   const candle = appState.candles[index];
   if (!candle) {
@@ -509,9 +525,14 @@ async function loadData(force = false) {
     applyPayload(payload);
     startLivePolling();
   } catch (error) {
-    showError("API error", String(error));
+    const message = String(error);
+    showError("API error", message);
+    enterSafeNoTradeState(message);
     if (modeSelect.value === "live") {
-      setLiveStatusText(`LIVE error: ${String(error)}`, "#ff7b72");
+      setLiveStatusText(`LIVE error: ${message}`, "#ff7b72");
+    }
+    if (modeSelect.value === "mt5_csv") {
+      setLiveStatusText(`MT5 CSV error: ${message}`, "#ff7b72");
     }
   }
 }
