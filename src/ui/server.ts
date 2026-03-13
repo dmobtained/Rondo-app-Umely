@@ -91,7 +91,12 @@ async function serveFile(path: string): Promise<{ status: number; body: string; 
 const server = createServer(async (request, response) => {
   const url = request.url ?? "/";
   if (url === "/api/demo") {
-    const payload = JSON.stringify(buildApiPayload());
+    const payload = JSON.stringify(buildApiPayload(), (_, value) => {
+      if (typeof value === "number" && !Number.isFinite(value)) {
+        return value > 0 ? "Infinity" : "-Infinity";
+      }
+      return value;
+    });
     response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
     response.end(payload);
     return;
