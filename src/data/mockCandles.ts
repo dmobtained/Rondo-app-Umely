@@ -41,7 +41,7 @@ export function buildMockScenario(symbol = "XAUUSD"): {
     [100.55, 100.7, 100.3, 100.4],
     [100.4, 100.5, 100.1, 100.25],
     [100.25, 100.4, 100.0, 100.1],
-    [100.1, 101.2, 99.95, 100.35], // liquidity sweep above equal highs, reclaim close
+    [100.1, 101.3, 99.95, 100.35], // liquidity sweep above equal highs, reclaim close
     [100.35, 100.45, 99.9, 99.95], // bearish continuation
     [99.95, 100.1, 99.6, 99.7], // break of internal low (BOS)
     [99.7, 99.9, 98.9, 99.1],

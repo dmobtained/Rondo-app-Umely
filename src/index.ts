@@ -13,16 +13,35 @@ function createDemoConfig(): DorisViewConfig {
       alignWithHtfBias: false,
       minAtrPct: 0.0001,
       chopThresholdPct: 0.0002,
+      maxEntryToStopPct: 0.03,
     },
     swing: {
       ...defaultConfig.swing,
       externalLeftBars: 2,
       externalRightBars: 2,
+      minSwingSizePct: 0.00001,
+      minSwingDistanceBars: 1,
+    },
+    liquidity: {
+      ...defaultConfig.liquidity,
+      minimumSwingSignificance: 0.00001,
+      rangeLookbackBars: 20,
+      equalLevelTolerancePct: 0.0008,
+    },
+    sweep: {
+      ...defaultConfig.sweep,
+      minOvershootPct: 0.00005,
+      maxConfirmationCandles: 8,
+    },
+    bos: {
+      ...defaultConfig.bos,
+      requireBodyClose: false,
+      maxBreakCandlesAfterSweep: 10,
     },
     risk: {
       ...defaultConfig.risk,
       accountSize: 25_000,
-      minRiskReward: 1.8,
+      minRiskReward: 1.4,
     },
   };
 }

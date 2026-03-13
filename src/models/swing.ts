@@ -15,9 +15,9 @@ export interface MarketStructureState {
   readonly bias: StructureBias;
   readonly externalSwings: readonly SwingPoint[];
   readonly internalSwings: readonly SwingPoint[];
-  readonly lastHigherHigh?: SwingPoint;
-  readonly lastHigherLow?: SwingPoint;
-  readonly lastLowerHigh?: SwingPoint;
-  readonly lastLowerLow?: SwingPoint;
+  readonly lastHigherHigh: SwingPoint | undefined;
+  readonly lastHigherLow: SwingPoint | undefined;
+  readonly lastLowerHigh: SwingPoint | undefined;
+  readonly lastLowerLow: SwingPoint | undefined;
   readonly notes: readonly string[];
 }
