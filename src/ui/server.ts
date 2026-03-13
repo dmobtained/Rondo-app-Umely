@@ -273,7 +273,7 @@ const server = createServer(async (request, response) => {
       const mt5 = runMt5CsvPipeline({
         csvText,
         sourceTimeframe,
-        symbol: body.symbol,
+        ...(body.symbol ? { symbol: body.symbol } : {}),
       });
       const payload = buildApiPayload({
         mode: "mt5_csv",
