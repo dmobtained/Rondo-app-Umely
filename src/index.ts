@@ -1,60 +1,8 @@
-import { runBacktest } from "./backtest/backtestEngine.js";
-import { buildMockScenario } from "./data/mockCandles.js";
-import { defaultConfig, type DorisViewConfig } from "./models/config.js";
-import { DorisViewStrategy } from "./strategies/dorisViewStrategy.js";
+import { runDemoPipeline } from "./demo/demoPipeline.js";
 import { logger } from "./utils/logger.js";
 
-function createDemoConfig(): DorisViewConfig {
-  return {
-    ...defaultConfig,
-    filters: {
-      ...defaultConfig.filters,
-      sessionFilterEnabled: true,
-      alignWithHtfBias: false,
-      minAtrPct: 0.0001,
-      chopThresholdPct: 0.0002,
-      maxEntryToStopPct: 0.03,
-    },
-    swing: {
-      ...defaultConfig.swing,
-      externalLeftBars: 2,
-      externalRightBars: 2,
-      minSwingSizePct: 0.00001,
-      minSwingDistanceBars: 1,
-    },
-    liquidity: {
-      ...defaultConfig.liquidity,
-      minimumSwingSignificance: 0.00001,
-      rangeLookbackBars: 20,
-      equalLevelTolerancePct: 0.0008,
-    },
-    sweep: {
-      ...defaultConfig.sweep,
-      minOvershootPct: 0.00005,
-      maxConfirmationCandles: 8,
-    },
-    bos: {
-      ...defaultConfig.bos,
-      requireBodyClose: false,
-      maxBreakCandlesAfterSweep: 10,
-    },
-    risk: {
-      ...defaultConfig.risk,
-      accountSize: 25_000,
-      minRiskReward: 1.4,
-    },
-  };
-}
-
 function runDemo(): void {
-  const config = createDemoConfig();
-  const { htfCandles, ltfCandles } = buildMockScenario(config.symbol);
-  const strategy = new DorisViewStrategy(config);
-  const analysis = strategy.analyze({
-    htfCandles,
-    ltfCandles,
-    symbol: config.symbol,
-  });
+  const { analysis, backtest } = runDemoPipeline();
 
   logger.info("DorisView analysis completed.", {
     htfBias: analysis.htfStructure.bias,
@@ -69,12 +17,6 @@ function runDemo(): void {
   if (analysis.setups.length > 0) {
     logger.info("First setup preview", analysis.setups[0]);
   }
-
-  const backtest = runBacktest({
-    candles: ltfCandles,
-    setups: analysis.setups,
-    config,
-  });
 
   logger.info("Backtest metrics", backtest.metrics);
   logger.info("Trade outcomes", backtest.trades.map((trade) => ({

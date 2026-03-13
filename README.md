@@ -85,6 +85,29 @@ Dit draait:
 2. Detectie-overzicht (pools, sweeps, BOS, FVG, setups)
 3. Backtest metrics + trade outcomes
 
+## Kleine chart UI (MT5 invoer zichtbaar)
+
+Je kunt een simpele browser-UI starten om te zien wat de engine "tekent" op de chart:
+
+```bash
+npm run ui
+```
+
+Open daarna:
+
+```text
+http://localhost:8787
+```
+
+In de UI zie je:
+- candlestick chart
+- sweep marker
+- BOS level
+- entry zone (upper/lower)
+- entry / stop loss / take profit lijnen
+- MT5 invoervelden (order type, entry, SL, TP)
+- lot size calculator (account + risk%)
+
 ## TODO (bewust buiten scope van v1 foundation)
 
 - Broker execution adapters (MT5/cTrader/REST)

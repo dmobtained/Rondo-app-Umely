@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DorisView Chart UI</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>DorisView Setup Visualizer</h1>
+      <p class="muted">See chart drawings + exact MT5 order values</p>
+    </header>
+
+    <main class="layout">
+      <section class="card chart-card">
+        <div class="chart-toolbar">
+          <label for="setup-select">Setup:</label>
+          <select id="setup-select"></select>
+          <span id="summary" class="muted"></span>
+        </div>
+        <div id="chart"></div>
+      </section>
+
+      <aside class="card side-panel">
+        <h2>MT5 Input Values</h2>
+        <div id="setup-meta" class="meta-grid"></div>
+
+        <h3>Risk to lot calculator</h3>
+        <div class="form-grid">
+          <label>Account ($)</label>
+          <input id="account-size" type="number" step="0.01" />
+
+          <label>Risk %</label>
+          <input id="risk-pct" type="number" step="0.01" />
+
+          <label>$ per $1 move per 1.00 lot</label>
+          <input id="point-value" type="number" step="0.01" value="100" />
+        </div>
+        <button id="recalc">Recalculate</button>
+        <div id="lot-result" class="pill"></div>
+
+        <h3>Why this setup</h3>
+        <ul id="reasons"></ul>
+      </aside>
+    </main>
+
+    <section class="card metrics">
+      <h2>Backtest snapshot</h2>
+      <pre id="metrics"></pre>
+    </section>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
