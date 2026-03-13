@@ -145,7 +145,11 @@ export function runBacktest(args: {
     }
 
     const directionMultiplier = setup.direction === "long" ? 1 : -1;
-    const pnl = (closePrice - setup.entryPrice) * directionMultiplier * sizing.quantity;
+    const pnl =
+      (closePrice - setup.entryPrice) *
+      directionMultiplier *
+      sizing.quantity *
+      config.risk.instrumentPointValue;
     const pnlR = sizing.riskAmount === 0 ? 0 : pnl / sizing.riskAmount;
     const outcome = closeReason === "take_profit" ? "win" : "loss";
     day.trades += 1;
