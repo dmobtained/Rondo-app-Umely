@@ -1,9 +1,11 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
+import type { IncomingMessage } from "node:http";
 import { runLivePipeline } from "../live/livePipeline.js";
+import { runMt5CsvPipeline } from "../live/mt5CsvPipeline.js";
 import { runDemoPipeline } from "../demo/demoPipeline.js";
-import type { Candle } from "../models/candle.js";
+import type { Candle, Timeframe } from "../models/candle.js";
 import type { DorisViewConfig } from "../models/config.js";
 import type { StrategyAnalysisResult } from "../strategies/dorisViewStrategy.js";
 import type { BacktestResult } from "../backtest/backtestEngine.js";
@@ -83,8 +85,8 @@ function toUiSetups(setups: StrategyAnalysisResult["setups"]): UiSetupRow[] {
 }
 
 function buildApiPayload(args: {
-  mode: "demo" | "live";
-  source: "mock" | "twelvedata";
+  mode: "demo" | "live" | "mt5_csv";
+  source: "mock" | "twelvedata" | "mt5_csv";
   fetchedAt: string;
   providerSymbol?: string;
   pipeline: PipelineShape;
@@ -112,6 +114,34 @@ function buildApiPayload(args: {
     backtestMetrics: result.backtest.metrics,
     backtestTrades: result.backtest.trades,
   };
+}
+
+async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
+  return new Promise<T>((resolvePromise, rejectPromise) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    const maxBytes = 10 * 1024 * 1024;
+
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        rejectPromise(new Error("Request payload too large (max 10MB)."));
+        request.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on("error", (error) => rejectPromise(error));
+    request.on("end", () => {
+      try {
+        const text = Buffer.concat(chunks).toString("utf8");
+        const parsed = JSON.parse(text) as T;
+        resolvePromise(parsed);
+      } catch (error) {
+        rejectPromise(error);
+      }
+    });
+  });
 }
 
 function jsonResponse(payload: unknown): { status: number; body: string; type: string } {
@@ -214,6 +244,52 @@ const server = createServer(async (request, response) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       response.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: message }));
+      return;
+    }
+  }
+
+  if (path === "/api/mt5/csv") {
+    if (request.method !== "POST") {
+      response.writeHead(405, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "Use POST for /api/mt5/csv." }));
+      return;
+    }
+
+    try {
+      const body = await readJsonBody<{
+        csvText?: string;
+        sourceTimeframe?: Timeframe;
+        symbol?: string;
+      }>(request);
+      const csvText = body.csvText ?? "";
+      const sourceTimeframe = body.sourceTimeframe ?? "1m";
+      if (!csvText || csvText.trim().length === 0) {
+        response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ error: "csvText is required." }));
+        return;
+      }
+
+      const mt5 = runMt5CsvPipeline({
+        csvText,
+        sourceTimeframe,
+        symbol: body.symbol,
+      });
+      const payload = buildApiPayload({
+        mode: "mt5_csv",
+        source: "mt5_csv",
+        fetchedAt: mt5.fetchedAt,
+        providerSymbol: mt5.providerSymbol,
+        pipeline: mt5.result,
+      });
+
+      const json = jsonResponse(payload);
+      response.writeHead(json.status, { "Content-Type": json.type });
+      response.end(json.body);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
       response.end(JSON.stringify({ error: message }));
       return;
     }

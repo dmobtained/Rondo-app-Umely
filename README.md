@@ -131,6 +131,25 @@ Daarna in de UI:
 
 Zonder API key blijft demo mode beschikbaar en krijg je een duidelijke foutmelding in live mode.
 
+### MT5 CSV mode (broker-exacte candles)
+
+Als je 1-op-1 wilt matchen met jouw MT5 chart (bijv. XAUUSDm), gebruik `MT5 CSV` mode:
+
+1. Exporteer candles uit MT5 (History Center / Save as CSV)
+2. Start UI:
+
+```bash
+npm run ui
+```
+
+3. Open `http://localhost:8787`
+4. Kies mode `MT5 CSV`
+5. Upload je CSV file
+6. Kies de CSV timeframe (M1/M5/M15/H1)
+7. Klik `Analyse CSV`
+
+De engine resampled intern naar LTF/HTF voor structuurdetectie en tekent daarna setups op jouw brokerdata.
+
 ## TODO (bewust buiten scope van v1 foundation)
 
 - Broker execution adapters (MT5/cTrader/REST)

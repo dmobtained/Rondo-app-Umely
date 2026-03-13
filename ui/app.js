@@ -3,6 +3,9 @@ const setupSelect = document.getElementById("setup-select");
 const modeSelect = document.getElementById("mode-select");
 const symbolInput = document.getElementById("symbol-input");
 const refreshLiveBtn = document.getElementById("refresh-live");
+const mt5FileInput = document.getElementById("mt5-file-input");
+const mt5Timeframe = document.getElementById("mt5-timeframe");
+const analyzeMt5Btn = document.getElementById("analyze-mt5");
 const liveStatus = document.getElementById("live-status");
 const summary = document.getElementById("summary");
 const setupMeta = document.getElementById("setup-meta");
@@ -21,6 +24,7 @@ let candleSeries = null;
 let overlaySeries = [];
 let markerPlugin = null;
 let livePollingTimer = null;
+let mt5CsvText = "";
 
 function fmt(value, decimals = 3) {
   return Number(value).toFixed(decimals);
@@ -217,12 +221,17 @@ function renderSetup(setupId) {
 
 function updateModeControls() {
   const liveMode = modeSelect.value === "live";
-  symbolInput.disabled = !liveMode;
+  const mt5Mode = modeSelect.value === "mt5_csv";
+  symbolInput.disabled = !(liveMode || mt5Mode);
   refreshLiveBtn.disabled = !liveMode;
+  mt5FileInput.disabled = !mt5Mode;
+  mt5Timeframe.disabled = !mt5Mode;
+  analyzeMt5Btn.disabled = !mt5Mode;
 }
 
-function getApiPath(force = false) {
-  if (modeSelect.value === "live") {
+function getApiPath(force = false, modeOverride) {
+  const mode = modeOverride ?? modeSelect.value;
+  if (mode === "live") {
     const symbol = encodeURIComponent(symbolInput.value.trim() || "XAU/USD");
     const forceFlag = force ? "&force=1" : "";
     return `/api/live?symbol=${symbol}${forceFlag}`;
@@ -230,8 +239,32 @@ function getApiPath(force = false) {
   return "/api/demo";
 }
 
-async function fetchPayload(force = false) {
-  const response = await fetch(getApiPath(force));
+async function fetchPayload(force = false, modeOverride) {
+  const mode = modeOverride ?? modeSelect.value;
+  if (mode === "mt5_csv") {
+    if (!mt5CsvText || mt5CsvText.trim().length === 0) {
+      throw new Error("Upload eerst je MT5 CSV file en klik daarna op Analyse CSV.");
+    }
+    const response = await fetch("/api/mt5/csv", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        csvText: mt5CsvText,
+        sourceTimeframe: mt5Timeframe.value,
+        symbol: symbolInput.value.trim() || "XAUUSDm",
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = payload?.error ? String(payload.error) : `HTTP ${response.status}`;
+      throw new Error(detail);
+    }
+    return payload;
+  }
+
+  const response = await fetch(getApiPath(force, mode));
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = payload?.error ? String(payload.error) : `HTTP ${response.status}`;
@@ -325,10 +358,15 @@ function applyPayload(payload) {
 
   const source = appState.source?.toUpperCase?.() ?? "UNKNOWN";
   const generatedAt = appState.generatedAt ? new Date(appState.generatedAt).toLocaleTimeString() : "n/a";
-  if (modeSelect.value === "live") {
+  if (appState.mode === "live") {
     setLiveStatusText(
       `LIVE ${source} | Updated ${generatedAt} | ${appState.providerSymbol ?? "XAU/USD"}`,
       "#56d364",
+    );
+  } else if (appState.mode === "mt5_csv") {
+    setLiveStatusText(
+      `MT5 CSV loaded | Updated ${generatedAt} | ${appState.providerSymbol ?? "XAUUSDm"}`,
+      "#58a6ff",
     );
   } else {
     setLiveStatusText(`DEMO ${source} | Updated ${generatedAt}`, "#8b949e");
@@ -379,13 +417,43 @@ async function init() {
       loadData(true).catch((error) => showError("Refresh error", String(error)));
     }
   });
+  analyzeMt5Btn.addEventListener("click", () => {
+    if (modeSelect.value === "mt5_csv") {
+      loadData(true).catch((error) => showError("CSV analyse error", String(error)));
+    }
+  });
+  mt5FileInput.addEventListener("change", async () => {
+    const file = mt5FileInput.files?.[0];
+    if (!file) {
+      mt5CsvText = "";
+      return;
+    }
+    mt5CsvText = await file.text();
+    setLiveStatusText(`CSV selected: ${file.name} (${Math.round(file.size / 1024)} KB)`, "#58a6ff");
+  });
   modeSelect.addEventListener("change", () => {
     stopLivePolling();
+    if (modeSelect.value === "mt5_csv" && (!mt5CsvText || mt5CsvText.trim().length === 0)) {
+      updateModeControls();
+      clearSetupPanels();
+      summary.textContent = "Upload je MT5 CSV en klik Analyse CSV.";
+      summary.style.color = "#8b949e";
+      setLiveStatusText("MT5 mode ready. Waiting for CSV file.", "#58a6ff");
+      return;
+    }
     loadData(true).catch((error) => showError("Mode change error", String(error)));
   });
   symbolInput.addEventListener("change", () => {
     if (modeSelect.value === "live") {
       loadData(true).catch((error) => showError("Symbol change error", String(error)));
+    }
+    if (modeSelect.value === "mt5_csv" && mt5CsvText.trim().length > 0) {
+      loadData(true).catch((error) => showError("Symbol change error", String(error)));
+    }
+  });
+  mt5Timeframe.addEventListener("change", () => {
+    if (modeSelect.value === "mt5_csv" && mt5CsvText.trim().length > 0) {
+      loadData(true).catch((error) => showError("Timeframe change error", String(error)));
     }
   });
   window.addEventListener("resize", () => {

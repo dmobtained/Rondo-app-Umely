@@ -20,10 +20,21 @@
           <select id="mode-select">
             <option value="demo">Demo</option>
             <option value="live">Live</option>
+            <option value="mt5_csv">MT5 CSV</option>
           </select>
           <label for="symbol-input">Symbol:</label>
           <input id="symbol-input" type="text" value="XAU/USD" />
           <button id="refresh-live" type="button">Refresh now</button>
+          <label for="mt5-file-input">CSV file:</label>
+          <input id="mt5-file-input" type="file" accept=".csv,.txt,text/csv,text/plain" />
+          <label for="mt5-timeframe">CSV TF:</label>
+          <select id="mt5-timeframe">
+            <option value="1m">M1</option>
+            <option value="5m">M5</option>
+            <option value="15m">M15</option>
+            <option value="1h">H1</option>
+          </select>
+          <button id="analyze-mt5" type="button">Analyse CSV</button>
           <label for="setup-select">Setup:</label>
           <select id="setup-select"></select>
           <span id="live-status" class="muted"></span>

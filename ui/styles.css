@@ -58,6 +58,19 @@ body {
   padding: 7px 10px;
 }
 
+#mt5-file-input {
+  max-width: 190px;
+}
+
+#mt5-timeframe {
+  width: 80px;
+}
+
+#analyze-mt5 {
+  margin-top: 0;
+  padding: 7px 10px;
+}
+
 #live-status {
   font-size: 12px;
 }
